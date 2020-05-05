@@ -1408,7 +1408,7 @@ ApplicationContext继承了BeanFactory**能够管理装配Bean**；继承了Reso
 
 ### 动态代理&AOP
 
-
+依靠后置处理器在getBean时初始化时执行postProcessAfterInitialization()生成代理对象， 为业务功能进行增强。
 
 **JDKProxy:**利用反射机制生成一个实现代理接口的匿名类,生成效率高。代理类必须实现接口
 
