@@ -552,7 +552,7 @@ condition自己维护了一个等待队列。线程在同步队列中才有机�
 
 ReentrantLock实现了Lock接口；Sync是ReentrantLock中的一个内部抽象类、继承了AQS；FairSync和NonfairSync都是ReentrantLock中的内部类，都继承了Sync，并且实现了Sync中的抽象方法。
 
-**获取锁过程**
+**获取锁过程**(非公平)
 
 a)     程A执行CAS执行成功，state值被修改并返回true，线程A继续执行。
 
@@ -822,12 +822,12 @@ execute提交任务后，执行addWorker，在addWorker里执行了Thread t = wo
 
 线程回收时JVM来回收的。具体逻辑在runWorker的while循环getTask()里，如果设置了allowCoreThreadTimeOut 或者工线程数量大于corePoolSize，则会从阻塞队列超时获取任务，keepAliveTime 时间后都没有拿到任务的话返回空，runWorker里的大循环结束，线程退出。
 
-**使用注意**（阿里爸爸java开发手册）
+**使用注意**（来自`《阿里爸爸java开发手册》`）
 
  【强制】线程池不允许使用 Executors 去创建，而是通过 ThreadPoolExecutor 的方式，这 样的处理方式让写的同学更加明确线程池的运行规则，规避资源耗尽的风险。 说明：Executors 返回的线程池对象的弊端如下：
 
 - FixedThreadPool 和 SingleThreadPool： 允许的请求队列长度为 Integer.MAX_VALUE，可能会堆积大量的请求，从而导致 OOM。  
-- CachedThreadPool： 允许的创建线程数量为 Integer.MAX_VALUE，可能会创建大量的线程，从而导致 OOM。  
+- CachedThreadPool： 允许的创建线程数量为 Integer.MAX_VALUE，可能会创建大量的线程，从而导致 OOM。 
 
 ### CopyOnWriteArrayList
 
@@ -1217,7 +1217,7 @@ Full GC：发生在老年代，一般会伴随年轻代的垃圾收集，所以�
 
 - 大对象直接分配在老年代上
 
-  -verbose:gc -XX:+PrintGCDetails -XX:+UseSerialGC -Xms20M -Xmx20M -Xmn10M - XX:PretenureSizeThreshold=3145728 
+  -verbose:gc -XX:+PrintGCDetails -XX:+UseSerialGC -Xms20M -Xmx20M -Xmn10M  <font color=red>- XX:PretenureSizeThreshold=3145728 </font>
 
 - 长期存活的对象进入老年代
 
@@ -1309,13 +1309,124 @@ Java Monitoring and Management Console是⼀种基于 JMX 的可视化监视、�
 
 ## Spring
 
-### IoC&Bean注入
+### IoC&DI
 
-### 动态代理
+ IoCInverseofControl反转控制的概念，就是将原本在程序中手动创建UserService对象的控制权，交由Spring框架管理，简单说，就是创建UserService对象控制权被反转到了Spring框架
 
-### AOP
+DI：DependencyInjection依赖注入，在Spring框架负责创建Bean对象时，动态的将依赖对象注入到Bean组件
 
-### 事务传播机制
+![](img/BeanFactory.jpg)
+
+![](img/BeanFactory继承关系.jpg)
+
+**Spring提供了BeanFactory和ApplicationContext。ApplicationContext接口是BeanFactory子接口**，更高级。
+
+ApplicationContext继承了BeanFactory**能够管理装配Bean**；继承了ResourcePatternResolver**能够加载资源文件**；继承了MessageSource**能够实现国际化等功能**；继承了ApplicationEventPublisher**能够注册监听器，实现监听机制**。
+
+开发中基本都在使用ApplicationContext,web项目使用WebApplicationContext，很少用到BeanFactory。
+
+**ClassPathXmlApplicationContext加载流程**
+
+- 调用父类AbstractRefreshableConfigApplicationContext的setConfigLocations(configLocations)设置Bean的xml配置路径   。
+
+-  调用父类AbstractApplicationContext的**refresh()**。IOC容器里面维护了一个单例的BeanFactory，如果bean的配置有修改，也可以直接调用refresh方法，它将销毁之前的BeanFactory，重新创建一个BeanFactory。  所以叫refresh 。
+
+  public void refresh() throws BeansException, IllegalStateException {
+          synchronized (this.startupShutdownMonitor) {
+              //准备刷新的上下文环境，例如对系统属性或者环境变量进行准备及验证。
+              prepareRefresh();
+              //初始化BeanFactory，并进行XML文件读取，
+              //这一步之后，ClassPathXmlApplicationContext实际上就已经包含了BeanFactory所提供的功能，也就是可以进行Bean的提取等基础操作了。
+              ConfigurableListableBeanFactory beanFactory = obtainFreshBeanFactory();
+              //对BeanFactory进行各种功能填充,@Qualifier与@Autowired这两个注解正是在这一步骤中增加的支持。
+              //设置@Autowired和 @Qualifier注解解析器QualifierAnnotationAutowireCandidateResolver
+  　　　　　　　prepareBeanFactory(beanFactory);
+              try {
+                  //子类覆盖方法做额外的处理,提供了一个空的函数实现postProcessBeanFactory来方便程序员在业务上做进一步扩展。
+                  postProcessBeanFactory(beanFactory);
+                  //激活各种BeanFactory处理器
+                 invokeBeanFactoryPostProcessors(beanFactory);
+                  //注册拦截Bean创建的Bean处理器,这里只是注册，真正的调用是在getBean时候
+                  registerBeanPostProcessors(beanFactory);
+                  //为上下文初始化Message源，即不同语言的消息体进行国际化处理
+                  initMessageSource();
+                  //初始化应用消息广播器，并放入“applicationEventMulticaster”bean中
+                  initApplicationEventMulticaster();
+                  //留给子类来初始化其它的Bean
+                  onRefresh();
+                  //在所有注册的bean中查找Listener bean，注册到消息广播器中
+                  registerListeners();
+                  //初始化剩下的单实例（非惰性的）
+                  finishBeanFactoryInitialization(beanFactory);
+                  //完成刷新过程，通知生命周期处理器lifecycleProcessor刷新过程，同时发出ContextRefreshEvent通知别人
+                  finishRefresh();
+              }
+              finally {
+                  // Reset common introspection caches in Spring's core, since we
+                  // might not ever need metadata for singleton beans anymore...
+                  resetCommonCaches();
+              }
+          }
+      }
+
+- 在refresh()里首先调用prepareRefresh()，**准备刷新的上下文环境，获取容器的当时时间，设置容器状态 例如对系统属性或者环境变量进行准备及验证**。
+
+- **加载beanFactory。**调用obtainFreshBeanFactory()，里面调用的是AbstractRefreshableApplicationContext的refreshBeanFactory():
+
+  **首先判断BeanFactory是否存在，存在则销毁beans并关闭beanFactory**。
+
+  然后**创建beanFactory**。DefaultListableBeanFactory beanFactory = createBeanFactory()。DefaultListableBeanFactory是容器的基础。
+
+  主要为**读取spring指定格式的xml配置文件并解析，将解析后的文件内容映射为相应的BeanDefinition，处理每个Bean元素和元素的值，最后将 beanDefinition  注册进 BeanFactory。DefaultListableBeanFactory维护了一个“beanDefinitionMap”的concurrentHashMap，最终将beanDefinition放入map--beanDefinitionMap.put(beanName, beanDefinition)。**loadBeanDefinitions(beanFactory)
+
+-  回到refresh方法，**对BeanFactory进行各种功能填充、配置处理器、监听器等**。
+- **实例化所有剩下的（非懒加载的业务）单例 bean，执行的是getBean()的逻辑。添加进“singletonObjects”的concurrentHashMap中**
+
+**getBean()逻辑：**
+
+-  **解析beanName** 
+-  **尝试从缓存中获取beanName对应的实例，如果能获取到，那么就直接返回。**
+- **校验多例bean的循环依赖。有则抛出异常。**
+- **检测parentBeanFactory**
+- **标记Bean已创建**（ 将beanName放到alreadyCreated的set中）
+- **递归初始化依赖的Bean**(也是调用的getBean()方法)
+- **创建Bean，属性注入,初始化bean**（AOP就是在初始化完成的)。**如果为单例则要加入添加进“singletonObjects”的concurrentHashMap中**。
+
+**Bean的生命周期**
+
+1. **实例化bean**(工厂方法或构造方法)
+2. **IoC注入Bean的属性**
+3. 如果这个Bean已经实现了<font color=red>**BeanNameAware**</font>接口，会调用它实现的<font color=red>**setBeanName(String)**</font>方法，此处传递的就是Spring配置文件中Bean的id值
+4. 如果这个Bean已经实现了<font color=red>**BeanFactoryAware**</font>接口，会调用它实现的<font color=red>**setBeanFactory(BeanFactory)**</font>传递的是当前工厂自身
+5. 如果这个Bean已经实现了<font color=red>**ApplicationContextAware**</font>接口，会调用<font color=red>**setApplicationContext(ApplicationContext)**</font>方法，传入当前ApplicationContext。
+6. 如果这个Bean**关联了<font color=blue>BeanPostProcessor</font>接口**，将会调用<font color=blue>**postProcessBeforeInitialization(Object bean, String beanName)**</font>方法。
+7. 调用配置指定的**init-method**方法，无则跳过。
+8. 如果这个Bean关联了**<font color=blue>BeanPostProcessor</font>**接口，将会调用**<font color=blue>postProcessAfterInitialization(Object bean, String beanName)</font>**方法，此时bean已经可以被使用了（AOP动态代理就是这个时候实现的）
+9. **如果bean作用域scope="Singleton"，则缓存bean**，交给spring管理
+10. 如果Bean实现了**DisposableBean**这个接口，会调用其实现的**destroy()**方法
+11. 调用配置指定的**destroy-method**方法，无则跳过。
+
+### 动态代理&AOP
+
+
+
+**JDKProxy:**利用反射机制生成一个实现代理接口的匿名类,生成效率高。代理类必须实现接口
+
+**CGLib:**而cglib动态代理是利用asm开源包，对代理对象类的class文件加载进来，通过修改其字节码生成子类来， 覆盖其中的方法 。执行效率高。类和方法不能声明为final。
+
+### **事务传播**
+
+[详细实验]( https://segmentfault.com/a/1190000013341344 )
+
+| 事务传播行为类型          | 说明                                                         |
+| ------------------------- | ------------------------------------------------------------ |
+| PROPAGATION_REQUIRED      | 如果当前没有事务，就新建一个事务，如果已经存在一个事务中，加入到这个事务中。这是**最常见**的选择。 |
+| PROPAGATION_SUPPORTS      | 支持当前事务，如果当前没有事务，就以非事务方式执行。         |
+| PROPAGATION_MANDATORY     | 使用当前的事务，如果当前没有事务，就抛出异常。               |
+| PROPAGATION_REQUIRES_NEW  | 新建事务，如果当前存在事务，把当前事务挂起。                 |
+| PROPAGATION_NOT_SUPPORTED | 以非事务方式执行操作，如果当前存在事务，就把当前事务挂起。   |
+| PROPAGATION_NEVER         | 以非事务方式执行，如果当前存在事务，则抛出异常。             |
+| PROPAGATION_NESTED        | 如果当前存在事务，则在嵌套事务内执行。如果当前没有事务，则执行与PROPAGATION_REQUIRED类似的操作。 |
 
 ## Mybatis
 
@@ -1353,7 +1464,31 @@ Java Monitoring and Management Console是⼀种基于 JMX 的可视化监视、�
 
 ## 数据库
 
+### 事务
 
+**四个特性**
+
+- 原子性（Atomicity）
+  原子性是指事务是一个不可分割的工作单位，事务中的操作要么都发生，要么都不发生。
+  比如：转账转过去的加和转时候的减必须一次发生
+- 一致性（Consistency）
+  事务必须使数据库从一个一致性状态变换到另外一个一致性状态。
+  比如：转账时双方的总数在转账的时候保持一致
+- 隔离性（Isolation）
+  事务的隔离性是多个用户并发访问数据库时，数据库为每一个用户开启的事务，不能被其他事务的操作数据所干扰，多个并发事务之间要相互隔离。
+  比如：多个用户操纵，防止数据干扰，就要为每个客户开启一个自己的事务
+- 持久性（Durability）
+  持久性是指一个事务一旦被提交，它对数据库中数据的改变就是永久性的，接下来即使数据库发生故障也不应该对其有任何影响。
+  比如：如果我commit提交后 无论发生什么都 都不会影响到我提交的数据
+
+**隔离级别**
+
+ 数据库默认隔离级别（mysql：repeatable read；oracle：read commited）
+
+- read uncommited：最低级别，不加锁，允许读取未提交数据，可能出现脏读，不可重复读，幻读 
+- read commited：写的过程行锁锁住数据，避免脏读，可能出现不可重复读，幻读 
+- repeatable read：行锁锁住数据整个事务，避免脏读和不可重复读，可能出现幻读 **留坑**
+- serializable：表锁锁住数据整个事务，避免三种情况，效率最低，锁整个表。  
 
 ## 操作系统
 
