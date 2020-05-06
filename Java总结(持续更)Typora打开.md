@@ -351,7 +351,7 @@ java内存模型决定一个线程对共享变量的写入时对其他线程是�
 
 ![](img/jmm.png)
 
-#### 总结
+总结
 
 <font color=red>什么是Java内存模型：java内存模型简称jmm，定义了一个线程对另一个线程可见。共享变量存放在主内存中，每个线程都有自己的本地内存，当多个线程同时访问一个数据的时候，可能本地内存没有及时刷新到主内存，所以就会发生缓存一致性问题。</font>
 
@@ -562,7 +562,7 @@ c)     *这一步执行的是addWaiter(Node.EXCLUSIVE)，及其调用的enq(fina
 
 生成新Node节点node，并通过CAS指令插入到等待队列的队尾（同一时刻可能会有多个Node节点插入到等待队列中），如果tail节点为空，则将head节点指向一个空节点（代表线程B，B线程正在执行它想做的事）
 
-d)    *这一步执行的是 **acquireQueued(addWaiter(Node.EXCLUSIVE), arg))里的自旋逻辑，里面的addWaiter(Node.EXCLUSIVE)在上一步已经执行。*
+d)    *这一步执行的是 acquireQueued(addWaiter(Node.EXCLUSIVE), arg))里的自旋逻辑，里面的addWaiter(Node.EXCLUSIVE)在上一步已经执行。*
 
  node插入到队尾后，该线程不会立马挂起，会进行自旋操作。因为在node的插入过程，线程B（即之前没有阻塞的线程）可能已经执行完成，所以要判断该node的前一个节点pred是否为head节点（代表线程B），如果pred == head，表明当前节点是队列中第一个“有效的”节点，因此再次尝试tryAcquire获取锁。
 
@@ -623,11 +623,11 @@ public class CountDownLatchDemo {
                     e.printStackTrace();
                 }
                 System.out.println(Thread.currentThread().getName()+" finished");
-                countDownLatch.countDown();
+                countDownLatch.countDown();//state为0唤醒await的线程
             });
         }
 
-        countDownLatch.await();
+        countDownLatch.await();//只要state不为0就等待
         System.out.println("all finished");
     }
 }
@@ -635,28 +635,60 @@ public class CountDownLatchDemo {
 
 实现原理
 
-**await内部实现流程:**
+**await()内部实现流程:**
 
 1. 判断state计数是否为0，不是，则直接放过执行后面的代码
 2. 大于0，则表示需要阻塞等待计数为0
-3. 当前线程封装Node对象，进入阻塞队列
+3. 当前线程封装成Node节点，进入阻塞队列
 4. 然后就是循环尝试获取锁，直到成功（即state为0）后出队，继续执行线程后续代码
 
- **countDown内部实现流程:**
+```java
+public final void acquireSharedInterruptibly(int arg)
+            throws InterruptedException {
+        if (Thread.interrupted())
+            throw new InterruptedException();
+        if (tryAcquireShared(arg) < 0)
+            doAcquireSharedInterruptibly(arg);
+    }
+protected int tryAcquireShared(int acquires) {
+            return (getState() == 0) ? 1 : -1;
+        }
 
-1.  尝试释放锁`tryReleaseShared`。
+```
+
+
+
+ **countDown()内部实现流程:**
+
+1.尝试释放锁`tryReleaseShared`。
 
 - CAS乐观锁的方式计数器减1
-
 - 若减完之后，state==0，表示没有线程占用锁，即释放成功，然后就需要唤醒被阻塞的线程了
 
-  
+2.释放并唤醒阻塞线程 `doReleaseShared`也就是唤醒调用await()的线程
 
-  2.释放并唤醒阻塞线程 `doReleaseShared`
+```java
+  public final boolean releaseShared(int arg) {
+        if (tryReleaseShared(arg)) {
+            doReleaseShared();
+            return true;
+        }
+        return false;
+    }
+ protected boolean tryReleaseShared(int releases) {
+            // Decrement count; signal when transition to zero
+            for (;;) {
+                int c = getState();
+                if (c == 0)
+                    return false;
+                int nextc = c-1;
+                if (compareAndSetState(c, nextc))
+                    return nextc == 0;
+            }
+        }
+    }
 
-- 如果队列为空，即表示没有线程被阻塞（也就是说没有线程调用了 CountDownLatch#wait()方法），直接退出
-
-- 头结点如果为SIGNAL, 则依次唤醒头结点下个节点上关联的线程，并出队
+```
 
 #### CyclicBarrier
 
@@ -680,7 +712,7 @@ public class CyclicBarrierDemo {
                 System.out.println("move to start line");
                 try {
                     Thread.sleep(t);
-                    barrier.await();
+                    barrier.await();//state不为0则等待，为0则signalAll
                 } catch (InterruptedException | BrokenBarrierException e) {
                     e.printStackTrace();
                 }
@@ -706,11 +738,54 @@ Thread-3 run
 
 大致原理：
 
-内部会调用trip.await()方法进入Condition等待阻塞队列；一旦计数器数量为零时则调用condition的signalAll()所有线程被唤醒。
+CyclicBarrier里维护了一个ReentrantLock 和一个叫trip的condition
+
+计数器未达到0，内部会调用trip.await()方法进入Condition等待阻塞队列；一旦计数器数量为零时则调用condition的signalAll()所有线程被唤醒。
 
 #### Semaphore
 
-Semaphore就是一个信号量，它的作用是**限制某段代码块的并发数**。Semaphore有一个构造函数，可以传入一个int型整数n，表示某段代码最多只有n个线程可以访问，如果超出了n，那么请等待，等到某个线程执行完毕这段代码块，下一个线程再进入。由此可以看出如果Semaphore构造函数中传入的int型整数n=1，相当于变成了一个互斥锁了。
+Semaphore就是一个信号量，它的作用是**限制某段代码块的并发数**。Semaphore有一个构造函数，可以传入一个int型整数n，表示某段代码最多只有n个线程可以访问，如果超出了n，那么请等待，等到某个线程执行完毕这段代码块，下一个线程再进入。线程每成功释放一个资源都会唤醒后续等待的一个节点。由此可以看出如果Semaphore构造函数中传入的int型整数n=1，相当于变成了一个互斥锁了。
+
+```java
+public final void acquireSharedInterruptibly(int arg)
+            throws InterruptedException {
+        if (Thread.interrupted())
+            throw new InterruptedException();
+        if (tryAcquireShared(arg) < 0)
+            doAcquireSharedInterruptibly(arg);
+    }
+  protected int tryAcquireShared(int acquires) {//acquire后小于0则等待
+            for (;;) {
+                if (hasQueuedPredecessors())
+                    return -1;
+                int available = getState();
+                int remaining = available - acquires;
+                if (remaining < 0 ||
+                    compareAndSetState(available, remaining))
+                    return remaining;
+            }
+        }
+//release成功后唤醒一个登海线程
+ public final boolean releaseShared(int arg) {
+        if (tryReleaseShared(arg)) {
+            doReleaseShared();
+            return true;
+        }
+        return false;
+    }
+ protected final boolean tryReleaseShared(int releases) {
+            for (;;) {
+                int current = getState();
+                int next = current + releases;
+                if (next < current) // overflow
+                    throw new Error("Maximum permit count exceeded");
+                if (compareAndSetState(current, next))
+                    return true;
+            }
+        }
+```
+
+
 
 ### BlockingQueue们
 
