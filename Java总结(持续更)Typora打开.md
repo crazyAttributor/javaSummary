@@ -332,7 +332,7 @@ jdk8开始hashmap链表在节点长度达到8之后会变成红黑树，这样�
 
 #### HashTable
 
-##### HashMap和HashTable的区别
+**HashMap和HashTable的区别**
 
 - HashMap允许null值，HashTable不允许null值
 - HashTale线程安全，涉及修改的方法使用synchronize修饰
@@ -396,7 +396,7 @@ java内存模型决定一个线程对共享变量的写入时对其他线程是�
 
 **用法**
 
-用法参见:[synchronize的几种用法](https://blog.csdn.net/qq_41911762/article/details/102803868)
+用法:[synchronize的几种用法](https://blog.csdn.net/qq_41911762/article/details/102803868)
 
 **synchronize锁的优化**
 
@@ -540,7 +540,7 @@ AQS提供了一种实现阻塞锁和一系列依赖FIFO等待队列的同步器�
 
 实现的大致过程：当多个线程都来请求锁时，某一时刻有且只有一个线程能够获得锁（排它锁），那么剩余获取 不到锁的线程，都会到同步队列中去排队并阻塞自己，当有线程主动释放锁时，就会从同步队列中头节点开始释放一个排队的线程，让线程重新去竞争锁。
 
-##### condition的await/signal机制
+**condition的await/signal机制**
 
 condition自己维护了一个等待队列。线程在同步队列中才有机会去竞争锁。
 
@@ -582,19 +582,17 @@ e)     *这一步也是执行步骤d中的自旋逻辑的一部分，执行的�
 
 f)   *这一步执行的是parkAndCheckInterrupt()*
 
-线程每次被唤醒时，都要进行中断检测，如果发现当前线程被中断，那么抛出InterruptedException并退出循环。从无限循环的代码可以看出，并不是被唤醒的线程一定能获得锁，必须调用tryAccquire重新竞争，因为锁是非公平的，有可能被新加入的线程获得，从而导致刚被唤醒的线程再次被阻塞，这个细节充分体现了“非公平”的精髓。
+线程每次被唤醒时，都要进行中断检测，如果发现当前线程被中断，那么抛出InterruptedException并退出循环。从无限循环的代码可以看出，并不是被唤醒的线程一定能获得锁，必须调用tryAccquire重新竞争，因为锁是非公平的，有可能被新加入的线程获得，从而导致刚被唤醒的线程再次被阻塞，这个细节充分体现了“非公平”性。
 
 **释放锁过程**
 
 a)     如果头结点head的waitStatus值为-1，则用CAS指令重置为0
 
-b)     找到waitStatus值小于0的节点s，通过LockSupport.unpark(s.thread)唤醒线程
-
-详见[ReentrantLock非公平实现](https://blog.csdn.net/qq_41911762/article/details/102826741)
+b)     从尾结点回溯，找到离头节点最近的waitStatus值小于0的节点s，通过LockSupport.unpark(s.thread)唤醒线程
 
 ### 同步器们
 
-#### CountDownLatch
+**CountDownLatch**
 
 ountDownLatch是通过一个计数器来实现的，计数器的初始值为线程的数量。每当一个线程完成了自己的任务后，计数器的值就会减1。当计数器值到达0时，它表示所有的线程已经完成了任务，然后在闭锁上等待的线程就可以恢复执行任务。
 
@@ -690,7 +688,7 @@ protected int tryAcquireShared(int acquires) {
 
 ```
 
-#### CyclicBarrier
+**CyclicBarrier**
 
  CyclicBarrier 叫 循 环 栅 栏 ， 它 实 现 让 一 组 线 程 等 待 至 某 个 状 态 之 后 再 全 部 同 时 执 行 ， 而 且 当 所 有 等 待 线 程 被 释 放 后 ， CyclicBarrier 可 以 被 重 复 使 用 。 CyclicBarrier 的 典 型 应 用 场 景 是 用 来 等 待 并 发 线 程 结 束 。 CyclicBarrier 的 主 要 方 法 是 await()， await() 每 被 调 用 一 次 ， 计 数 便 会 减 少 1， 并 阻 塞 住 当 前 线 程 。 当 计 数 减 至 0 时 ， 阻 塞 解 除 ， 所 有 在 此 CyclicBarrier 上 面 阻 塞 的 线 程 开 始 运 行 。 在 这 之 后 ， 如 果 再 次 调 用 await()， 计 数 就 又 会 变 成 N-1， 新 一 轮 重 新 开 始 ， 这 便 是 Cyclic 的 含 义 所 在 。 CyclicBarrier.await() 带 有 返 回 值 ， 用 来 表 示 当 前 线 程 是 第 几 个 到 达 这 个 Barrier 的 线 程 。 
 
@@ -742,7 +740,7 @@ CyclicBarrier里维护了一个ReentrantLock 和一个叫trip的condition
 
 计数器未达到0，内部会调用trip.await()方法进入Condition等待阻塞队列；一旦计数器数量为零时则调用condition的signalAll()所有线程被唤醒。
 
-#### Semaphore
+**Semaphore**
 
 Semaphore就是一个信号量，它的作用是**限制某段代码块的并发数**。Semaphore有一个构造函数，可以传入一个int型整数n，表示某段代码最多只有n个线程可以访问，如果超出了n，那么请等待，等到某个线程执行完毕这段代码块，下一个线程再进入。线程每成功释放一个资源都会唤醒后续等待的一个节点。由此可以看出如果Semaphore构造函数中传入的int型整数n=1，相当于变成了一个互斥锁了。
 
@@ -899,7 +897,7 @@ execute提交任务后，执行addWorker，在addWorker里执行了Thread t = wo
 
 **使用注意**（来自`《阿里爸爸java开发手册》`）
 
- 【强制】线程池不允许使用 Executors 去创建，而是通过 ThreadPoolExecutor 的方式，这 样的处理方式让写的同学更加明确线程池的运行规则，规避资源耗尽的风险。 说明：Executors 返回的线程池对象的弊端如下：
+ 【强制】线程池不允许使用 Executors 去创建，而是通过 ThreadPoolExecutor 的方式，这样的处理方式让写的同学更加明确线程池的运行规则，规避资源耗尽的风险。 说明：Executors 返回的线程池对象的弊端如下：
 
 - FixedThreadPool 和 SingleThreadPool： 允许的请求队列长度为 Integer.MAX_VALUE，可能会堆积大量的请求，从而导致 OOM。  
 - CachedThreadPool： 允许的创建线程数量为 Integer.MAX_VALUE，可能会创建大量的线程，从而导致 OOM。 
@@ -1043,7 +1041,7 @@ final V putVal(K key, V value, boolean onlyIfAbsent) {
 
 用Usafe的getObjectVolatile()来判断当前位置是否有值，因为volatile修饰的table只能在table内存地址改变了才能对线程可见。
 
-当前槽点为空时，通过 CAS 新增。Java 这里的写法非常严谨，没有在判断槽点为空的情况下直接赋值，因为在判断槽点为空和赋值的瞬间，很有可能槽点已经被其他线程赋值了，所以我们采用 CAS 算法，能够保证槽点为空的情况下赋值成功，如果恰好槽点已经被其他线程赋值，当前 CAS 操作失败，会再次执行 for 自旋，再走槽点有值的 put 流程。
+当前槽点为空时，通过 CAS 新增。Java 这里的写法非常严谨，没有在判断槽点为空的情况下直接赋值，因为在判断槽点为空和赋值的瞬间，很有可能槽点已经被其他线程赋值了，所以采用 CAS 算法，能够保证槽点为空的情况下赋值成功，如果恰好槽点已经被其他线程赋值，当前 CAS 操作失败，会再次执行 for 自旋，再走槽点有值的 put 流程。
 
 当前槽点有值，锁住当前槽点。来保证同一时刻只会有一个线程能对槽点进行修改。
 
@@ -1114,7 +1112,7 @@ final V putVal(K key, V value, boolean onlyIfAbsent) {
   **运行时常量池**：运行时常量池属于方法区的一部分，用于存放静态编译产生的字面量和符号引用。该常量具有动态性，也就是说常量并不一定是编译时确定，运行时生成的常量也会存在这个常量池中。 
 
 
-## new这么多对象
+## 对象
 
 ### **对象的创建**
 
@@ -1122,11 +1120,10 @@ final V putVal(K key, V value, boolean onlyIfAbsent) {
 
 2.**为新生对象分配内存:**为新对象分配内存(内存大小在类加载完成后便可确认)。 **如果堆内存绝对规整,使用指针碰撞.否则使用空闲列表**，找到一块足够大的内存划分给对象实例. 
 
-分配空间为⾮原⼦步骤可能出现并发问题，解决方法
+**分配空间为⾮原⼦步骤可能出现并发问题，解决方法**
 
-1.采⽤**CAS配上失败重试**的⽅式保证更新操作的原⼦性 
-
-2.**本地线程分配缓冲**（Thread Local Allocation Buffer,TLAB）把内存分 配的动作按照线程划分在不同的空间之中进行，即每个线程在Java堆中预先分配一小块内存。
+1. 采⽤**CAS配上失败重试**的⽅式保证更新操作的原⼦性 
+2. **本地线程分配缓冲**（Thread Local Allocation Buffer,TLAB）把内存分 配的动作按照线程划分在不同的空间之中进行，即每个线程在Java堆中预先分配一小块内存。
 
 3.**初始化**：内存空间分配完成后会将整个空间都初始化为零值(不包括对象头). 
 
@@ -1138,7 +1135,7 @@ final V putVal(K key, V value, boolean onlyIfAbsent) {
 
 ![](img/对象内存布局.jpg)
 
- **对象头 ** **⽤于存储对象的元数据信息**
+ **对象头组成 ** **⽤于存储对象的元数据信息**
 
 - **Mark Word** 部分数据的⻓度在32位和64位虚拟机（未开启压缩指针）中分别为32bit和 64bit，存储对象⾃身的运⾏时数据如哈希值等。Mark Word⼀般被设计为⾮固定的数据结 构，以便存储更多的数据信息和复⽤⾃⼰的存储空间。 
 
@@ -1392,7 +1389,7 @@ DI：DependencyInjection依赖注入，在Spring框架负责创建Bean对象时�
 
 ![](img/BeanFactory.jpg)
 
-![](img/BeanFactory继承关系.jpg)
+![BeanFactory](img/BeanFactory继承关系.jpg)
 
 **Spring提供了BeanFactory和ApplicationContext。ApplicationContext接口是BeanFactory子接口**，更高级。
 
@@ -1476,7 +1473,7 @@ ApplicationContext继承了BeanFactory**能够管理装配Bean**；继承了Reso
 5. 如果这个Bean已经实现了<font color=red>**ApplicationContextAware**</font>接口，会调用<font color=red>**setApplicationContext(ApplicationContext)**</font>方法，传入当前ApplicationContext。
 6. 如果这个Bean**关联了<font color=blue>BeanPostProcessor</font>接口**，将会调用<font color=blue>**postProcessBeforeInitialization(Object bean, String beanName)**</font>方法。
 7. 调用配置指定的**init-method**方法，无则跳过。
-8. 如果这个Bean关联了**<font color=blue>BeanPostProcessor</font>**接口，将会调用**<font color=blue>postProcessAfterInitialization(Object bean, String beanName)</font>**方法，此时bean已经可以被使用了（AOP动态代理就是这个时候实现的）
+8. 如果这个Bean关联了**<font color=blue>BeanPostProcessor</font>**接口，将会调用**<font color=blue>postProcessAfterInitialization(Object bean, String beanName)</font>**方法，此时bean已经可以被使用了（**AOP动态代理就是这个时候实现的**）
 9. **如果bean作用域scope="Singleton"，则缓存bean**，交给spring管理
 10. 如果Bean实现了**DisposableBean**这个接口，会调用其实现的**destroy()**方法
 11. 调用配置指定的**destroy-method**方法，无则跳过。
@@ -1505,7 +1502,23 @@ ApplicationContext继承了BeanFactory**能够管理装配Bean**；继承了Reso
 
 ## Mybatis
 
+### **执行流程**
 
+通过**SqlSessionFactoryBuilder.build()**方法初始化mybatis(解析xml文件构建成Configuration对象)并初始化SqlSessionFactory对象，在解析xml时会同时根据其中节点做相应的初始化操作。关键节点：settings、typeAliases、mappers
+
+**通过SqlSesssionFactory.openSession()方法打开一个SqlSession对象**。		     		 SqlSessionFactory对象的作用是里面存了全局的配置信息以及初始化环境和DataSource，DataSource对象可以用来开辟连接，SqlSessionFactory对象是用来保存全局信息并且打开数据库连接。在打开SqlSession对象的时候就会开辟一个连接对象并传给SqlSession对象，和数据库打交道的操作入口在于SqlSession对象
+
+ **通过SqlSession.getMapper()根据传入的Mapper对象类型动态代理并返回一个动态代理后的Mapper对象**
+
+ 	**SqlSession.select()/update()。**MapperProxy对象的invoke()方法执行后再执行execure方法，再根据情况选择执行select/update
+
+ 	**Executor执行Query/queryFromDatabase，在前面经过参数名封装和缓存查询之后（缓存为空），会调用queryFromDatabase方法去数据库当中查**
+
+ 	**SimpleExecurot执行doQuery()方法，初始化prepareStatement并且给#{}参数赋值**
+
+​	**StatementHandler执行query()方法，执行sql语句**
+
+​	**ResuletHandler.handleResultSets()方法封装结果集**
 
 ## SpringBoot
 
@@ -1513,23 +1526,119 @@ ApplicationContext继承了BeanFactory**能够管理装配Bean**；继承了Reso
 
 # 中间件
 
+## RabbitMQ
 
+## Redis
 
-## 消息中间件
+#### 持久化
 
+**RDB**
 
+保存某一时刻的内存快照，对内存的全量复制，生成临时rdb替换旧的rdb
 
-### RabbitMQ
+**特点**：故障数据丢失比aof严重，但是二进制体积小，服务重启恢复数据快； 
 
+**自动化触发时机**
 
+- 配置文件的SAVE m n定时生成rdb(一般不配置)
+- 主从复制时，主节点自动触发
+- 执行Debug Reload
+- 执行Shutdown且没有开启AOF持久化
 
-## 缓存
+**bgsave原理**
 
+主进程fork出一条子进程来生成rdb，只能有一条子进程来生成rdb，否则报错。copy-on-write：主进程fork出的子进程共享主进程的内存空间，当主进程要对某个内存页修改时，发生read-only中断，复制要修改的内存页，主进程对其修改，其它内存还是和子进程共享，子进程继续生成rdb。
 
+**AOF**
 
-### Redis
+通过追加执行过的命令到aof文件来达到持久化。
 
+**特点**： 故障数据丢失较rdb少，但是服务启动时恢复数据慢，因为要把aof文件中指令执行一遍。 
 
+**rewrite原理：** 主进程fork一个子进程，进行aof重写，子进程把新的AOF写入到一个临时文件，主进程持续讲新的变动同时写到重写缓冲区和原来的AOF里（即使重写失败也不会丢失更新），子进程重写完后通知主进程，往新的AOF同步增量，最后替换掉旧的aof文件。
+
+**混合持久化**（4.0）
+
+AOF在进行文件<font color=red>**重写**时</font>， fork出的子进程先将共享的内存副本全量以RDB的方式写入aof。这样提高了速度也极大的缩小了aof文件。写完还是通知主进程，然后再将重写缓冲区的内容以AOF方式写入到文件，然后替换旧的aof文件。 
+
+特点： 混合持久化结合了RDB持久化 和 AOF 持久化的优点, 由于绝大部分都是RDB格式，加载速度快，同时结合AOF，增量的数据以AOF方式保存了，数据更少的丢失。 兼容性差，4.0以前不识别，阅读性差
+
+#### 主从复制
+
+**全量复制**
+
+slave发送命令psync到master，master启动后台进程生成rdb快照，在此期间master将新的命令缓存起来，生成rdb后将rdb发送给slave，slave使用新的rdb替换旧的rdb，master将这期间收集的增量命令发送给master。
+
+**部分复制**
+
+如果发生网络抖动，slave之丢失部分数据，没必要全量复制。在丢失期间，master会将增量命令写入缓冲区。slave发送psync命令给master，将偏移量和runid告诉master，master根据偏移量计算slave丢失的数据大小，如果大于缓冲区则进行全量复制，否则将缓冲区的数据发送给slave。
+
+#### Sentinel
+
+**故障转移**
+
+1.从slave节点中选出一个“合适的”节点作为新的master节点
+
+2.对选出的节点执行slaveof no one命令让其成为master节点
+
+3.向其余的slave节点发送命令，让他们成为新master节点的slave节点，然后复制数据，复制并行数量和parallel-syncs有关
+
+更新原来master节点配置为slave，并保持对其关注，当其回复后命令它去复制新的master节点。
+
+选择合适的slave节点
+
+1.根据机器的配置，设置slave的优先级，让配置好的机器优先成为master，默认优先级一样，当这个条件不满足走2
+
+2.选择复制偏移量最大的slave节点（复制的最完整），若不存在
+
+3.runid最小的slave节点（启动最早的节点)
+
+#### 缓存击穿、缓存穿透、缓存雪崩
+
+**缓存击穿**
+
+非常热点的key过期导致大量请求直接走数据库。
+
+解决：
+
+- 设置热点数据永不过期，将逻辑过期时间存在key对应的value里，如果发现要过期了，通过一个后台的异步线程进行缓存的构建，也就是“逻辑”过期 ，或者更新时就刷新缓存。
+
+- 设置互斥锁
+
+  public String get(key) {
+        String value = redis.get(key);
+        if (value == null) { //代表缓存值过期
+            //设置3min的超时，防止del操作失败的时候，下次缓存过期一直不能load db
+  		  if (redis.setnx(key_mutex, 1, 3 * 60) == 1) {  //代表设置成功
+                 value = db.get(key);
+                        redis.set(key, value, expire_secs);
+                        redis.del(key_mutex);
+                } else {  //这个时候代表同时候的其他线程已经load db并回设到缓存了，这时候重试获取缓存值即可
+                        sleep(50);
+                        get(key);  //重试
+                }
+            } else {
+                return value;    
+
+   }
+
+**缓存穿透**
+
+查询缓存和数据库里都没有的数据，导致每次请求都走数据库，频繁请求这些不存在的数据来攻击应用导致数据库挂掉。
+
+解决：
+
+- 做好参数校验
+- 对查询到的空结果进行缓存，并设置较短的过期时间
+- 布隆过滤器拦截
+
+**缓存雪崩**
+
+设置缓存时指定了相同的过期时间，导致缓存在同一时间失效，导致请求走数据库。
+
+解决：
+
+- 设置随机的过期时间，避免同一时间大量key失效
 
 # 基础知识
 
