@@ -4,6 +4,14 @@
 
 ## java基础
 
+ **接口和抽象类的区别是什么** 
+
+1. 接口的方法默认是 public，所有方法在接口中不能有实现(Java 8 开始接口方法可以有默认实现），抽象类可以 有非抽象的方法 
+2. 接口中的实例变量默认是 final 类型的，而抽象类中则不一定 
+3. 一个类可以实现多个接口，但最多只能实现一个抽象类 
+4. 一个类实现接口的话要实现接口的所有方法，而抽象类不一定 
+5. 接口不能用 new 实例化，但可以声明，但是必须引用一个实现该接口的对象 从设计层面来说，抽象是对类的抽 象，是一种模板设计，接口是行为的抽象，是一种行为的规范。  
+
 
 
 ## java集合
@@ -1381,6 +1389,30 @@ Java Monitoring and Management Console是⼀种基于 JMX 的可视化监视、�
 
 ## Spring
 
+ ### ConfigurationClassPostProcessor作用
+
+ConfigurationClassPostProcessor是一个BeanFactory的后置处理器，因此它的主要功能是参与BeanFactory的建造，在这个类中，会解析加了@Configuration的配置类，还会解析@ComponentScan、@ComponentScans注解扫描的包，以及解析@Import等注解。
+
+ConfigurationClassPostProcessor 实现了 BeanDefinitionRegistryPostProcessor 接口，而 BeanDefinitionRegistryPostProcessor 接口继承了 BeanFactoryPostProcessor 接口，所以 ConfigurationClassPostProcessor 中需要重写 postProcessBeanDefinitionRegistry() 方法和 postProcessBeanFactory() 方法。而ConfigurationClassPostProcessor类的作用就是通过这两个方法去实现的。
+
+### 常见扩展点
+
+**BeanDefinitionRegistryPostProcessor**：继承BeanFactoryPostProcessor 接口，允许在普通的BeanFactoryPostProcessor接口实现类执行之前注册更多的BeanDefinition 。经常被用来注册BeanFactoryPostProcessor的BeanDefinition。 *Mybatis和spring整合时，我们通常会在application.xml中配置一个Bean，也就是MapperScannerConfigurer（该类实现了BeanDefinitionRegistryPostProcessor接口，所以支持动态注册mapper为Bean组件，并注入到spring容器中）。指定该Bean的包扫描路径属性。*
+
+**ImportBeanDefinitionRegistrar**：允许注册更多的BeanDefinition ，这个类需要与`@Import`和`@Configuration`共同配合使用 。*mybatis中@MapperScan 注解就是利用ImportBeanDefinitionRegister 。*
+
+**BeanFactoryPostProcessor**： 这个接口允许自定义修改应用程序上下文的BeanDefinition，调整上下文的BeanFactory的bean属性值 
+
+**BeanPostProcessor**： BeanPostProcessor对bean实例进行操作。自定义init-method执行前执行 Object **postProcessBeforeInitialization**(Object arg0, String arg1) 。自定义init-method执行后执行Object **postProcessAfterInitialization** (Object arg0, String arg1) 。
+
+**BeanNameAware**：实现该接口并重写void setBeanName(String var1)方法；获取该bean在BeanFactory配置中的名字
+
+**ApplicationContextAware**：实现该接口，并重写setApplicationContext(ApplicationContext applicationContext)方法，获取spring 上下文环境的对象，然后通过该上下文对象获取spring容器中的bean对象
+
+**BeanFactoryAware**:实现该接口，并重写void setBeanFactory(BeanFactory beanFactory) 方法，Bean获取配置他们的BeanFactory的引用
+
+![](img/spring扩展点.png)
+
 ### IoC&DI
 
  IoCInverseofControl反转控制的概念，就是将原本在程序中手动创建UserService对象的控制权，交由Spring框架管理，简单说，就是创建UserService对象控制权被反转到了Spring框架
@@ -1460,7 +1492,7 @@ ApplicationContext继承了BeanFactory**能够管理装配Bean**；继承了Reso
 -  **尝试从缓存中获取beanName对应的实例，如果能获取到，那么就直接返回。**
 - **校验多例bean的循环依赖。有则抛出异常。**
 - **检测parentBeanFactory**
-- **标记Bean已创建**（ 将beanName放到alreadyCreated的set中）
+- **标记Bean已创建**、
 - **递归初始化依赖的Bean**(也是调用的getBean()方法)
 - **创建Bean，属性注入,初始化bean**（AOP就是在初始化完成的)。**如果为单例则要加入添加进“singletonObjects”的concurrentHashMap中**。
 
@@ -1471,16 +1503,112 @@ ApplicationContext继承了BeanFactory**能够管理装配Bean**；继承了Reso
 3. 如果这个Bean已经实现了<font color=red>**BeanNameAware**</font>接口，会调用它实现的<font color=red>**setBeanName(String)**</font>方法，此处传递的就是Spring配置文件中Bean的id值
 4. 如果这个Bean已经实现了<font color=red>**BeanFactoryAware**</font>接口，会调用它实现的<font color=red>**setBeanFactory(BeanFactory)**</font>传递的是当前工厂自身
 5. 如果这个Bean已经实现了<font color=red>**ApplicationContextAware**</font>接口，会调用<font color=red>**setApplicationContext(ApplicationContext)**</font>方法，传入当前ApplicationContext。
-6. 如果这个Bean**关联了<font color=blue>BeanPostProcessor</font>接口**，将会调用<font color=blue>**postProcessBeforeInitialization(Object bean, String beanName)**</font>方法。
-7. 调用配置指定的**init-method**方法，无则跳过。
-8. 如果这个Bean关联了**<font color=blue>BeanPostProcessor</font>**接口，将会调用**<font color=blue>postProcessAfterInitialization(Object bean, String beanName)</font>**方法，此时bean已经可以被使用了（**AOP动态代理就是这个时候实现的**）
-9. **如果bean作用域scope="Singleton"，则缓存bean**，交给spring管理
-10. 如果Bean实现了**DisposableBean**这个接口，会调用其实现的**destroy()**方法
-11. 调用配置指定的**destroy-method**方法，无则跳过。
+6. initializingBean的afterPropertiesSet()方法。
+7. 如果这个Bean**关联了<font color=blue>BeanPostProcessor</font>接口**，将会调用<font color=blue>**postProcessBeforeInitialization(Object bean, String beanName)**</font>方法。
+8. 调用配置指定的**init-method**方法，无则跳过。
+9. 如果这个Bean关联了**<font color=blue>BeanPostProcessor</font>**接口，将会调用**<font color=blue>postProcessAfterInitialization(Object bean, String beanName)</font>**方法，此时bean已经可以被使用了（**AOP动态代理就是这个时候实现的**）
+10. **如果bean作用域scope="Singleton"，则缓存bean**，交给spring管理
+11. 如果Bean实现了**DisposableBean**这个接口，会调用其实现的**destroy()**方法
+12. 调用配置指定的**destroy-method**方法，无则跳过。
 
-### 动态代理&AOP
+### 循环依赖解决
 
-依靠后置处理器在getBean时初始化时执行postProcessAfterInitialization()生成代理对象， 为业务功能进行增强。
+ 假如beanA和beaB存在循环依赖。getBean(beaA)时beanA进行初始化，将beanA添加到singletonsCurrentlyInCreation中，表示正在创建。并提前向外暴露一个单例工厂添加到singletonFactories里，从而使其他bean能引用到该beanA 。然后populateBean()为beaA注入依赖。
+
+由于A中要注入B，所以触发getBean(B)(递归调用)，B执行同样步骤，在populateBean为B注入A的时候，又会调用getBean(A),发现beanA正在被创建中且beanA的一个工厂方法被注册到singletonFactories中，所以这时getBean(A)不会再继续递归了，会得到半成品beanA，注入到beanB中，beanB初始化完成后singletonObjects。递归逐级返回，依次创建好了beanB和beanA。
+
+1.getBean()先执行的这个
+
+```java
+  protected Object getSingleton(String beanName, boolean allowEarlyReference) {
+        Object singletonObject = this.singletonObjects.get(beanName);//看bean是否被创建完成
+        if (singletonObject == null && this.isSingletonCurrentlyInCreation(beanName)) {//如果没被创建完成且正在创建
+            Map var4 = this.singletonObjects;
+            synchronized(this.singletonObjects) {
+                singletonObject = this.earlySingletonObjects.get(beanName);//从earlySingletonObjects获取
+                if (singletonObject == null && allowEarlyReference) {//earlySingletonObjects获取不到则从singletonFactories获取
+                    ObjectFactory<?> singletonFactory = (ObjectFactory)this.singletonFactories.get(beanName);
+                    //获取到后从singletonFactories清除，然后添加到earlySingletonObjects，以后其他bean在该bean创建完成之前要依赖该bean则从earlySingletonObjects获取了，因为从singletonFactories获取要执行一次后置处理器，减少了开销
+                    if (singletonFactory != null) {
+                        singletonObject = singletonFactory.getObject();
+                        this.earlySingletonObjects.put(beanName, singletonObject);
+                        this.singletonFactories.remove(beanName);
+                    }
+                }
+            }
+        }
+```
+
+```java
+public Object getSingleton(String beanName, ObjectFactory<?> singletonFactory) {
+        Assert.notNull(beanName, "Bean name must not be null");
+        Map var3 = this.singletonObjects;
+        synchronized(this.singletonObjects) {
+            Object singletonObject = this.singletonObjects.get(beanName);
+            if (singletonObject == null) {
+                if (this.singletonsCurrentlyInDestruction) {
+                    throw new BeanCreationNotAllowedException(beanName, "Singleton bean creation not allowed while singletons of this factory are in destruction (Do not request a bean from a BeanFactory in a destroy method implementation!)");
+                }
+
+                if (this.logger.isDebugEnabled()) {
+                    this.logger.debug("Creating shared instance of singleton bean '" + beanName + "'");
+                }
+				//-------------------------------
+                this.beforeSingletonCreation(beanName);//加入singletonsCurrentlyInCreation
+                //-------------------------------
+                boolean newSingleton = false;
+                boolean recordSuppressedExceptions = this.suppressedExceptions == null;
+                if (recordSuppressedExceptions) {
+                    this.suppressedExceptions = new LinkedHashSet();
+                }
+
+                try {
+                    //-----------------------------
+                    singletonObject = singletonFactory.getObject();//创建bean，创建bean工厂加入singletonFactories，递归创建依赖
+                    //------------------------------
+                    newSingleton = true;
+                } catch (IllegalStateException var16) {
+                    singletonObject = this.singletonObjects.get(beanName);
+                    if (singletonObject == null) {
+                        throw var16;
+                    }
+                } catch (BeanCreationException var17) {
+                    BeanCreationException ex = var17;
+                    if (recordSuppressedExceptions) {
+                        Iterator var8 = this.suppressedExceptions.iterator();
+
+                        while(var8.hasNext()) {
+                            Exception suppressedException = (Exception)var8.next();
+                            ex.addRelatedCause(suppressedException);
+                        }
+                    }
+
+                    throw ex;
+                } finally {
+                    if (recordSuppressedExceptions) {
+                        this.suppressedExceptions = null;
+                    }
+
+                    this.afterSingletonCreation(beanName);
+                }
+
+                if (newSingleton) {
+                    //-------------------------
+                    this.addSingleton(beanName, singletonObject);//添加到singletonObjects（chm）
+                    //-------------------------
+                }
+            }
+
+            return singletonObject;
+        }
+    }
+```
+
+### @EnableAspectJAutoProxy
+
+@EnableAspectJAutoProxy引入了@Import({AspectJAutoProxyRegistrar.class}), AspectJAutoProxyRegistrar将AnnotationAwareAspectJAutoProxyCreator这个类定义为BeanDefinition放到spring容器中。 这个类实现了BeanPostProcessor接口，这个接口的postProcessAfterInitialization方法会在bean初始化结束后(赋值完成)被调用 ，生成代理对象， 为业务功能进行增强。
+
+### 两种动态代理
 
 **JDKProxy:**利用反射机制生成一个实现代理接口的匿名类,生成效率高。代理类必须实现接口
 
@@ -1500,17 +1628,52 @@ ApplicationContext继承了BeanFactory**能够管理装配Bean**；继承了Reso
 | PROPAGATION_NEVER         | 以非事务方式执行，如果当前存在事务，则抛出异常。             |
 | PROPAGATION_NESTED        | 如果当前存在事务，则在嵌套事务内执行。如果当前没有事务，则执行与PROPAGATION_REQUIRED类似的操作。 |
 
+## SpringMVC
+
+**SpringMVC执行流程:**
+
+1. 用户发送请求至前端控制器DispatcherServlet
+2. DispatcherServlet收到请求调用处理器映射器HandlerMapping。
+3. 处理器映射器根据请求url找到具体的处理器，生成处理器执行链HandlerExecutionChain(包括处理器对象和处理器拦截器)一并返回给DispatcherServlet。
+4.  DispatcherServlet根据处理器Handler获取处理器适配器HandlerAdapter执行HandlerAdapter处理一系列的操作，如：参数封装，数据格式转换，数据验证等操作
+
+5. 执行处理器Handler(Controller，也叫页面控制器)。
+6.  Handler执行完成返回ModelAndView
+7.  HandlerAdapter将Handler执行结果ModelAndView返回到DispatcherServlet
+8.  DispatcherServlet将ModelAndView传给ViewReslover视图解析器
+9.  ViewReslover解析后返回具体View
+10.  DispatcherServlet对View进行渲染视图（即将模型数据model填充至视图中）。
+11.  DispatcherServlet响应用户。
+
+![](img/springmvc执行流程.png)
+
+**各大组件**
+
+DispatcherServlet：前端控制器。用户请求到达前端控制器，它就相当于mvc模式中的c，dispatcherServlet是整个流程控制的中心，由它调用其它组件处理用户的请求，dispatcherServlet的存在降低了组件之间的耦合性,系统扩展性提高。由框架实现
+
+HandlerMapping：处理器映射器。HandlerMapping负责根据用户请求的url找到Handler即处理器，springmvc提供了不同的映射器实现不同的映射方式，根据一定的规则去查找,例如：xml配置方式，实现接口方式，注解方式等。由框架实现
+
+Handler：处理器。Handler 是继DispatcherServlet前端控制器的后端控制器，在DispatcherServlet的控制下Handler对具体的用户请求进行处理。由于Handler涉及到具体的用户业务请求，所以一般情况需要程序员根据业务需求开发Handler。
+
+HandlAdapter：处理器适配器。通过HandlerAdapter对处理器进行执行，这是适配器模式的应用，通过扩展适配器可以对更多类型的处理器进行执行。由框架实现。
+
+ModelAndView是springmvc的封装对象，将model和view封装在一起。
+
+ViewResolver：视图解析器。ViewResolver负责将处理结果生成View视图，ViewResolver首先根据逻辑视图名解析成物理视图名即具体的页面地址，再生成View视图对象，最后对View进行渲染将处理结果通过页面展示给用户。
+
+View:是springmvc的封装对象，是一个接口, springmvc框架提供了很多的View视图类型，包括：jspview，pdfview,jstlView、freemarkerView、pdfView等。一般情况下需要通过页面标签或页面模版技术将模型数据通过页面展示给用户，需要由程序员根据业务需求开发具体的页面。
+
 ## Mybatis
 
 ### **执行流程**
 
-通过**SqlSessionFactoryBuilder.build()**方法初始化mybatis(解析xml文件构建成Configuration对象)并初始化SqlSessionFactory对象，在解析xml时会同时根据其中节点做相应的初始化操作。关键节点：settings、typeAliases、mappers
+通过**SqlSessionFactoryBuilder.build()方法初始化mybatis(解析xml文件构建成Configuration对象)并初始化SqlSessionFactory对象**，在解析xml时会同时根据其中节点做相应的初始化操作。关键节点：settings、typeAliases、mappers
 
 **通过SqlSesssionFactory.openSession()方法打开一个SqlSession对象**。		     		 SqlSessionFactory对象的作用是里面存了全局的配置信息以及初始化环境和DataSource，DataSource对象可以用来开辟连接，SqlSessionFactory对象是用来保存全局信息并且打开数据库连接。在打开SqlSession对象的时候就会开辟一个连接对象并传给SqlSession对象，和数据库打交道的操作入口在于SqlSession对象
 
  **通过SqlSession.getMapper()根据传入的Mapper对象类型动态代理并返回一个动态代理后的Mapper对象**
 
- 	**SqlSession.select()/update()。**MapperProxy对象的invoke()方法执行后再执行execure方法，再根据情况选择执行select/update
+ 	**SqlSession.select()/update()。**MapperProxy对象的invoke()方法执行后再执行execute方法，再根据情况选择执行select/update
 
  	**Executor执行Query/queryFromDatabase，在前面经过参数名封装和缓存查询之后（缓存为空），会调用queryFromDatabase方法去数据库当中查**
 
@@ -1519,6 +1682,32 @@ ApplicationContext继承了BeanFactory**能够管理装配Bean**；继承了Reso
 ​	**StatementHandler执行query()方法，执行sql语句**
 
 ​	**ResuletHandler.handleResultSets()方法封装结果集**
+
+### 与spring整合后的mybatis
+
+**1.@MapperScan如何让Spring知道Mapper的定义**
+
+@MapperScan中的注解@Import(MapperScannerRegistrar.class)引入了public class <font color=red>MapperScannerRegistrar implements ImportBeanDefinitionRegistrar</font>, ResourceLoaderAware {}
+
+MapperScannerRegistrar重写了ImportBeanDefinitionRegistrar的 public void <font color=red>registerBeanDefinitions</font>(AnnotationMetadata importingClassMetadata, BeanDefinitionRegistry registry)根据包名扫描所有的class，生成Mapper的beanDefinitions。
+
+在processBeanDefinitions(Set beanDefinitions)时<font color=red>将Mapper的Mapper的BeanDefinition的class替换为mapperFactoryBean.getClass() 、beanDefiniton将自己的构造器参数设置为mapper的className 、 设置beanDefinition sqlSessionFactory属性的RuntimeBeanReference （ref）(在Spring处理依赖关系时，最终会将该引用替换成实际生成的Bean对象) </font>
+
+**2.如何执行SQL**
+
+每个MapperFactoryBean实例化时，就构造注入了mapperInterface的class，从SqlSession获取Mapper的时候用到。MapperFactoryBean创建Mapper代理对象，在Mapper代理对象中执行sqlSession的执行方法。其实这个sqlSession是一个实现了SqlSession接口的SqlSessionTemplate，在MapperFactoryBean创建后被装配。
+
+在SqlSessionTemplate中，有一个叫sqlSessionProxy的代理sqlSession，在创建SqlSessionTemplate的构造方法中被反射创建，反射处理器为SqlSessionInterceptor。
+
+sqlSessionTemplate是对sqlSessionProxy的包装，增删改查调用的是sqlSessionProxy里的方法，所以最终执行的是SqlSessionInterceptor这个反射处理器的invoke方法。
+
+invoke通过getSqlSession方法拿到事务上下文**DefaultSqlSession**实例--getSqlSession方法里会从事务管理器中通过**ThreadLocal获取** SqlSessionHolder(sqlSession的包装)，进而获取SqlSession，如果获取不到则从SqlSessionFactory获取并注册到事务管理器中。
+
+实际和数据库打交道的还是**DefaultSqlSession**
+
+[](https://www.cnblogs.com/sleepingDogs/p/11085436.html)
+
+[](https://www.cnblogs.com/sleepingDogs/p/11102335.html)
 
 ## SpringBoot
 
@@ -1663,9 +1852,9 @@ slave发送命令psync到master，master启动后台进程生成rdb快照，在�
   比如：多个用户操纵，防止数据干扰，就要为每个客户开启一个自己的事务
 - 持久性（Durability）
   持久性是指一个事务一旦被提交，它对数据库中数据的改变就是永久性的，接下来即使数据库发生故障也不应该对其有任何影响。
-  比如：如果我commit提交后 无论发生什么都 都不会影响到我提交的数据
+  比如：如果我commit提交后 无论发生什么都不会影响到我提交的数据
 
-**隔离级别**
+**MySQL事务隔离级别**
 
  数据库默认隔离级别（mysql：repeatable read；oracle：read commited）
 
