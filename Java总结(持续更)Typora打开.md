@@ -351,6 +351,16 @@ jdk8开始hashmap链表在节点长度达到8之后会变成红黑树，这样�
 
 ## 并发
 
+### java线程的几种状态
+
+![img](img/java线程状态.jpg)
+
+操作系统和JVM线程状态
+
+io时在操作系统看来是阻塞的，在jvm看来是runnable
+
+![](img/jvm和os线程状态.png)
+
 ### jmm(java memory model)
 
 java内存模型决定一个线程对共享变量的写入时对其他线程是否可见。线程之间的共享变量存储在主内存中，每个线程都有一个私有的本地内存，本地内存中存储了共享变量的副本。本地内存是JMM的一个抽象概念，并不真实存在。它涵盖了缓存，写缓冲区，寄存器以及其他的硬件和编译器优化。
@@ -1772,7 +1782,7 @@ slave发送命令psync到master，master启动后台进程生成rdb快照，在�
 
 3.向其余的slave节点发送命令，让他们成为新master节点的slave节点，然后复制数据，复制并行数量和parallel-syncs有关
 
-更新原来master节点配置为slave，并保持对其关注，当其回复后命令它去复制新的master节点。
+更新原来master节点配置为slave，并保持对其关注，当其恢复后命令它去复制新的master节点。
 
 **选择合适的slave节点**
 
@@ -1829,11 +1839,65 @@ slave发送命令psync到master，master启动后台进程生成rdb快照，在�
 
 - 设置随机的过期时间，避免同一时间大量key失效
 
+**内存淘汰策略**
+
+（1）volatile-lru：从已设置过期时间的数据集中挑选最近最少使用的数据淘汰。
+
+（2）volatile-ttl：从已设置过期时间的数据集中挑选将要过期的数据淘汰。
+
+（3）volatile-random：从已设置过期时间的数据集中任意选择数据淘汰。
+
+（4）volatile-lfu：从已设置过期时间的数据集挑选使用频率最低的数据淘汰。(新增)
+
+（5）allkeys-lru：从数据集中挑选最近最少使用的数据淘汰
+
+（6）allkeys-lfu：从数据集中挑选使用频率最低的数据淘汰。（新增）
+
+（7）allkeys-random：从数据集（server.db[i].dict）中任意选择数据淘汰
+
+（8） no-enviction（驱逐）：禁止驱逐数据，这也是默认策略。意思是当内存不足以容纳新入数据时，新写入操作就会报错，请求可以继续进行，线上任务也不能持续进行，采用no-enviction策略可以保证数据不被丢失。
+
+#### 数据结构
+
+**压缩列表**
+
+压缩列表是Redis为了节约内存而开发的，由一系列特殊编码的连续内存块组成的顺序型数据结构。一个压缩列表可以包含任意多个节点，每个节点可以保存一个字节数组或者一个整数值。
+
+压缩列表在Redis中的用途
+
+1. 作为列表键的底层实现之一：当一个列表键只包含少量列表项，并且每个列表项要么就是小整数值，要么就是长度比较短的字符串，那么Redis就会使用压缩列表来做列表键的底层实现。
+2. 作为哈希键的底层实现之一：当一个哈希键只包含少量键值对，并且每个键值对的键和值要么就是小整数值，要么就是长度比较短的字符串，那么Redis就会使用压缩列表来做哈希键的底层实现。
+
+**渐进式rehash**
+
+为了避免 rehash 对服务器性能造成影响， 服务器不是一次性将 旧hash表里面的所有键值对全部 rehash 到 新hash表 ，而是rehash 键值对所需的计算工作均滩到对字典的每个添加、删除、查找和更新操作上， 从而避免了集中式 rehash 而带来的庞大计算量。
+
+扩展与收缩的条件
+
+
+当以下条件满足任意一个时，程序就会对哈希表进行扩展操作
+
+服务器目前没有执行bgsave或bgrewriteaof命令，并且哈希表的负载因子>=1
+服务器目前正在执行bgsave或bgrewriteaof命令，并且哈希表的负载因子>=5
+负载因子的计算 
+load_factor=ht[0].used/ht[0].size
+当负载因子的值小于0.1时，程序就会对哈希表进行收缩操作
+
 # 基础知识
 
 ## 计算机网络
 
+### HTTPS
 
+通信过程
+
+<img src="img\https通信过程.png" alt="1592153239042"  />
+
+证书验证
+
+- 如果证书申请通过，CA会向申请者签发认证文件-证书。证书包含以下信息：申请者公钥、申请者的组织信息和个人信息、签发机构 CA的信息、有效时间、证书序列号等信息的明文，同时包含一个用CA私钥对**证书明文的摘要**加密后的信息，即签名。
+- 客户端读取证书中的相关的明文信息，采用相同的散列函数计算得到信息摘要，然后，利用对应 CA的公钥解密签名数据，对比证书的信息摘要，如果一致，则服务器的公开密钥是值得信赖的。
+- 客户端还会验证证书相关的域名信息、有效时间等信息; 客户端会内置信任CA的证书信息(包含公钥)，如果CA不被信任，则找不到对应 CA的证书，证书也会被判定非法。
 
 ## 数据库
 
@@ -1863,11 +1927,39 @@ slave发送命令psync到master，master启动后台进程生成rdb快照，在�
 - repeatable read：行锁锁住数据整个事务，避免脏读和不可重复读，可能出现幻读 **留坑**：如何避免幻读
 - serializable：表锁锁住数据整个事务，避免三种情况，效率最低，锁整个表。  
 
+### redo/undo log
+
+**redo log**
+
+为了避免数据库页面缓存未刷进磁盘而发生故障引起修改丢失，InnoDB对所有页面的修改操作都写入redo log，数据库启动时用redo log进行恢复操作。写redo log是顺序IO，比起用户数据刷盘（随机IO）非常快。
+
+**undo log**
+
+修改一条记录时，undo log会记录一条旧版本的数据，提供事务回滚和MVCC。所有的版本都会被DB_ROLL_PTR 属性连接成一个`版本链`，版本链的头节点就是当前记录最新的值。每个版本中还包含生成该版本时对应的事务id（`trx_id`）。
+
+**MVCC**
+
+新事务创建时，系统会根据事务的隔离级别在不同时机生成视图ReadView。事务系统会将当前未提交的所有事务 ID 组成的数组传递给这个新事务，`m_ids`集合。
+
+- 如果被访问版本的`trx_id`属性值与`ReadView`中的`creator_trx_id`值相同，意味着当前事务在访问它自己修改过的记录，所以该版本<font color=red>可以</font>被当前事务访问。
+- 如果被访问版本的`trx_id`属性值小于`ReadView`中的`min_trx_id`值，表明生成该版本的事务在当前事务生成`ReadView`前已经提交，所以该版本<font color=red>可以</font>被当前事务访问。
+- 如果被访问版本的`trx_id`属性值大于或等于`ReadView`中的`max_trx_id`值，表明生成该版本的事务在当前事务生成`ReadView`后才开启，所以该版本<font color=red>不可以</font>被当前事务访问。
+- 如果被访问版本的`trx_id`属性值在`ReadView`的`min_trx_id`和`max_trx_id`之间，那就需要判断一下`trx_id`属性值是不是在`m_ids`列表中，如果在，说明创建`ReadView`时生成该版本的事务还是活跃的，该版本<font color=red>不可以</font>被访问；如果不在，说明创建`ReadView`时生成该版本的事务已经被提交，该版本<font color=red>可以</font>被访问。
+
+果某个版本的数据对当前事务不可见的话，那就顺着版本链找到下一个版本的数据，继续按照上边的步骤判断可见性，依此类推，直到版本链中的最后一个版本。如果最后一个版本也不可见的话，那么就意味着该条记录对该事务完全不可见，查询结果就不包含该记录。
+
+读已提交和可重复读实现：
+
+- READ COMMITTD在每一次进行普通SELECT操作前都会生成一个ReadView。
+- REPEATABLE READ只在第一次进行普通SELECT操作前生成一个ReadView，之后的查询操作都重复使用这个ReadView。
+
+
+
 ## 算法
 
 ### 线性时间选择 和 快排
 
-这里的线性时间选择没有用中位数，而是随机+分区。
+*这里的线性时间选择没有用中位数，而是随机+分区。*
 
 快排和线性时间选择共用分区函数RandomizedPartition()
 
@@ -1888,7 +1980,7 @@ slave发送命令psync到master，master启动后台进程生成rdb快照，在�
         Arrays.stream(b).forEach(System.out::print);
     }
 
-    static int Partition(int a[], int p, int r) {//make the a[p] at right position j，finally the left is less than a[j] and the right more than a[j]
+    static int Partition(int a[], int p, int r) {//let a[p] be where it should be--j，finally the left is less than a[j] and the right more than a[j]
         int i = p + 1, j = r , x = a[p];
         while (true) {
             while (a[i] < x) {//让i往右移动，指向比a[p]大的数
@@ -1955,11 +2047,22 @@ slave发送命令psync到master，master启动后台进程生成rdb快照，在�
 
 ## 操作系统
 
+# 设计模式
 
+## 单例模式
 
+应用场景：如果希望在系统中某个类的对象只能存在一个，单例模式是最好的解决方案。
 
+## 工厂模式
 
+应用场景：创建对象需要大量的重复代码。应用不依赖实例如何被创建、实现等细节。创建对象推迟到工厂子类实现。
 
+体现：Collection下的iterator。由ArrayList实现工厂方法iterator()
 
+![](img\工厂模式Arraylist.png)
 
+## 抽象工厂模式
 
+应用场景：一系列相互依赖的对象”的创建工作;同时由于需求的变化，往往存在更多系列对象的创建工作。
+
+体现：java.sql.Connection下的获取各种statement的方法Statement createStatement()、PreparedStatement prepareStatement(String sql)，由com.mysql.jdbc.ConnectionImpl实现。MyBatis的SqlSessionFactory，返回SqlSession和Configuration，由子类DefaultSqlSessionFactory实现
